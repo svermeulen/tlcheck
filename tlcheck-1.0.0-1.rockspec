@@ -1,5 +1,5 @@
 package = "tlcheck"
-version = "0.1"
+version = "1.0.0-1"
 source = {
    url = "git@github.com:svermeulen/tlcheck.git"
 }
@@ -12,10 +12,16 @@ description = {
 dependencies = {
    "lua >= 5.1",
    "luafilesystem >= 1.5.0",
+   "tl >= 0.13.0",
 }
 build = {
    type = "builtin",
    modules = {
       tlcheck = "src/tlcheck.lua"
+   },
+   install = {
+     bin = {
+       ['tlcheck'] = 'bin/tlcheck'
+     }
    }
 }

@@ -1,8 +1,11 @@
 
 if #arg ~= 1 then
-   print("Teal Check\nUsage: teal-check [PATH]\nNote:\n- Given path can be a single .tl file or a directory (which will be searched recursively for all .tl files)\n- A tlconfig.lua file must be present in the given directory or a parent of the given directory/path")
+   print("Teal Check\nUsage: teal-check [PATH]\nNote:\n - Given path can be a single .tl file or a directory (which will be searched recursively for all .tl files)\n - A tlconfig.lua file must be present in the given directory or a parent of the given directory/path\n - This program is designed to be more script/machine friendly than human friendly.  The output is easy to parse but not easy to read")
    os.exit(1)
 end
+
+-- Conventions used here:
+--   * Path strings for directories always have a trailing slash
 
 local lfs <const> = require("lfs")
 local tl <const> = require("tl")
@@ -16,8 +19,14 @@ local function get_parent_path(path:string):string
    return path:match('(.*[/\\]).+')
 end
 
+local function path_is_absolute(path:string):boolean
+   local first_char = path:sub(1, 1)
+   return first_char == "/" or first_char == "\\"
+end
+
 local function try_find_tlconfig_path(start_search_path:string):string
-   assert(#start_search_path > 0)
+   assert(#start_search_path > 0, "Invalid path given")
+   assert(path_is_absolute(start_search_path))
 
    local search_dir:string
    local file_type = lfs.attributes(start_search_path, "mode")
@@ -25,7 +34,8 @@ local function try_find_tlconfig_path(start_search_path:string):string
    if file_type == "directory" then
       search_dir = start_search_path
 
-      local last_char = search_dir:sub(#search_dir - 1)
+      local last_char = search_dir:sub(#search_dir)
+
       if last_char ~= "/" and last_char ~= "\\" then
          search_dir = search_dir .. "/"
       end
@@ -36,8 +46,9 @@ local function try_find_tlconfig_path(start_search_path:string):string
 
    while search_dir ~= nil do
       for sub_path in lfs.dir(search_dir) do
-         if sub_path == "tlconfig.lua" then
-            return search_dir .. sub_path
+         local full_path = search_dir .. sub_path
+         if sub_path == "tlconfig.lua" and lfs.attributes(full_path, "mode") == "file" then
+            return full_path
          end
       end
 
@@ -54,6 +65,7 @@ local function process_include_dir_arg(include_dir:string|{string}, tlconfig_pat
 
    local all_dirs = {}
 
+   -- Allow both storing as a list or just one value as a string inside tlconfig.lua
    if include_dir is string then
       table.insert(all_dirs, include_dir)
    else
@@ -69,10 +81,7 @@ local function process_include_dir_arg(include_dir:string|{string}, tlconfig_pat
       if dir == "." then
          table.insert(adjusted_dirs, tlconfig_dir)
       else
-         local first_char = dir:sub(0)
-         local is_absolute = first_char == "/" or first_char == "\\"
-
-         if not is_absolute then
+         if not path_is_absolute(dir) then
             dir = tlconfig_dir .. dir
          end
 
@@ -89,6 +98,7 @@ local function process_include_dir_arg(include_dir:string|{string}, tlconfig_pat
 end
 
 local function process_global_env_def_arg(global_env_def:string|{string}):{string}
+   -- Allow both storing as a list or just one value as a string inside tlconfig.lua
    if global_env_def is string then
       return {global_env_def}
    end
@@ -96,11 +106,13 @@ local function process_global_env_def_arg(global_env_def:string|{string}):{strin
 end
 
 local function run_teal_check(path:string, global_modules:{string}):{tl.Error}
+
+   -- TODO - get these other parameter values from tlconfig.lua as well
    local env, env_error = tl.init_env(
       false, nil, nil, global_modules)
 
    if env == nil then
-      error("Failed to initialize teal environment!  Details: " .. tostring(env_error))
+      error("Failed to initialize teal environment!  Details: " .. env_error)
    end
 
    local result, process_error = tl.process(path, env)
@@ -117,12 +129,16 @@ local function run_teal_check(path:string, global_modules:{string}):{tl.Error}
       end
    end
 
-   for _, err in ipairs(result.syntax_errors) do
-      table.insert(all_errors, err)
+   if result.syntax_errors then
+      for _, err in ipairs(result.syntax_errors) do
+         table.insert(all_errors, err)
+      end
    end
 
-   for _, err in ipairs(result.type_errors) do
-      table.insert(all_errors, err)
+   if result.type_errors then
+      for _, err in ipairs(result.type_errors) do
+         table.insert(all_errors, err)
+      end
    end
 
    return all_errors
@@ -147,13 +163,29 @@ local function print_errors(errors:{tl.Error})
    end
 end
 
+local function get_path_from_args():string
+   local path = arg[1]
+
+   if not path_is_absolute(path) then
+      local cwd = lfs.currentdir()
+      assert(cwd, "Failed to obtain current directory")
+      local last_char = cwd:sub(#cwd)
+      if last_char ~= "/" and last_char ~= "\\" then
+         cwd = cwd .. "/"
+      end
+      path = cwd .. path
+   end
+
+   return path
+end
+
 local function main()
-   local path_to_check = arg[1]
+   local path_to_check = get_path_from_args()
 
    assert(lfs.attributes(path_to_check) ~= nil, "Invalid path given")
 
    local tlconfig_path = try_find_tlconfig_path(path_to_check)
-   assert(tlconfig_path ~= nil, "Unable to find a tlconfig.lua file for given path.  Searched in parent directories.")
+   assert(tlconfig_path ~= nil, "Unable to find a tlconfig.lua file!  Searched given path and all parents")
 
    local tlconfig:TealConfig = dofile(tlconfig_path) as TealConfig
 
