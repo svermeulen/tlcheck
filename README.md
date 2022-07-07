@@ -3,6 +3,8 @@
 
 A simple command line tool to type check a given [teal](https://github.com/teal-language/tl) file/directory and produce a list of warnings/errors
 
+[![test](https://github.com/svermeulen/tlcheck/actions/workflows/test.yml/badge.svg)](https://github.com/svermeulen/tlcheck/actions/workflows/test.yml)
+
 # Installation
 
 ### From luarocks
