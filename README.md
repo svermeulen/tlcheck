@@ -5,12 +5,12 @@ A simple command line tool to type check a given [teal](https://github.com/teal-
 
 # Installation
 
-## From luarocks
+*From luarocks*
 
 * `luarocks install tlcheck`
 * `tlcheck`
 
-## From source
+*From source*
 
 * Clone repo
 * From repo root:
