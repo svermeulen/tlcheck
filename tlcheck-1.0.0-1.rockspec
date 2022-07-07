@@ -1,5 +1,5 @@
 package = "tlcheck"
-version = "0.1"
+version = "1.0.0-1"
 source = {
    url = "git@github.com:svermeulen/tlcheck.git"
 }
