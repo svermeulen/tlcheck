@@ -31,5 +31,8 @@ jobs:
           luarocks make --dev
 
       - name: Test
-        run: tlcheck src/tlcheck.tl
+        run: |
+          pwd
+          which tlcheck
+          tlcheck `pwd`/src/tlcheck.tl
 
