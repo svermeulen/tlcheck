@@ -26,7 +26,8 @@ jobs:
 
       - name: Build
         run: |
-          luarocks install luafilesystem # TODO: luarocks seems to grab the wrong version with --dev
+          luarocks install luafilesystem
+          luarocks install tl
           luarocks make --dev
 
       - name: Test
