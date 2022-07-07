@@ -3,9 +3,32 @@
 
 A simple command line tool to type check a given [teal](https://github.com/teal-language/tl) file/directory and produce a list of warnings/errors
 
+# Installation
+
+## From luarocks
+
+* `luarocks install tlcheck`
+* `tlcheck`
+
+## From source
+
+* Clone repo
+* From repo root:
+  * `luarocks init`
+  * `./luarocks make`
+  * `./lua_modules/bin/tlcheck`
+
 # Usage
 
-TBD
+```
+tlcheck [PATH]
+```
+
+Note:
+
+* Given path can be a single .tl file or a directory (which will be searched recursively for all .tl files)
+* A tlconfig.lua file must be present in the given directory or a parent of the given directory/path
+* This program is designed to be more script/machine friendly than human friendly.  The output is easy to parse but not easy to read.  When no errors are found, there is zero output and the exit code is 0 (and otherwise will be 1)
 
 # FAQ
 
