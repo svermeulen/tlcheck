@@ -17,5 +17,10 @@ build = {
    type = "builtin",
    modules = {
       tlcheck = "src/tlcheck.lua"
+   },
+   install = {
+     bin = {
+       ['tlcheck'] = 'bin/tlcheck'
+     }
    }
 }
