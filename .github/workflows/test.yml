@@ -24,10 +24,8 @@ jobs:
         uses: leafo/gh-actions-luarocks@v4.0.0
 
       - name: Build
-        run: |
-          luarocks install luafilesystem # TODO: luarocks seems to grab the wrong version with --dev
-          luarocks make --dev
+        run: luarocks make --dev
 
       - name: Test
-        run: lua src/tlcheck.lua src/tlcheck.tl
+        run: tlcheck src/tlcheck.tl
 
