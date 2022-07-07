@@ -1,7 +1,9 @@
+rockspec_format = "3.0"
 package = "tlcheck"
 version = "1.0.0-1"
 source = {
-   url = "git@github.com:svermeulen/tlcheck.git"
+   url = "git+https://github.com/svermeulen/tlcheck.git",
+   branch = "main"
 }
 description = {
    summary = "Simple command line tool to type check a given teal file/directory",
