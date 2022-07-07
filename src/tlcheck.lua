@@ -24,6 +24,25 @@ local function path_is_absolute(path)
    return first_char == "/" or first_char == "\\"
 end
 
+local function path_has_trailing_slash(path)
+   local last_char = path:sub(#path)
+   return last_char == "/" or last_char == "\\"
+end
+
+local function get_sub_paths(path)
+   assert(lfs.attributes(path, "mode") == "directory")
+
+   local result = {}
+
+   for sub_path in lfs.dir(path) do
+      if sub_path ~= "." and sub_path ~= ".." then
+         table.insert(result, sub_path)
+      end
+   end
+
+   return result
+end
+
 local function try_find_tlconfig_path(start_search_path)
    assert(#start_search_path > 0, "Invalid path given")
    assert(path_is_absolute(start_search_path))
@@ -33,19 +52,14 @@ local function try_find_tlconfig_path(start_search_path)
 
    if file_type == "directory" then
       search_dir = start_search_path
-
-      local last_char = search_dir:sub(#search_dir)
-
-      if last_char ~= "/" and last_char ~= "\\" then
-         search_dir = search_dir .. "/"
-      end
+      assert(path_has_trailing_slash(search_dir))
    else
       assert(file_type == "file", "Invalid path given")
       search_dir = get_parent_path(start_search_path)
    end
 
    while search_dir ~= nil do
-      for sub_path in lfs.dir(search_dir) do
+      for _, sub_path in ipairs(get_sub_paths(search_dir)) do
          local full_path = search_dir .. sub_path
          if sub_path == "tlconfig.lua" and lfs.attributes(full_path, "mode") == "file" then
             return full_path
@@ -85,8 +99,7 @@ local function process_include_dir_arg(include_dir, tlconfig_path)
             dir = tlconfig_dir .. dir
          end
 
-         local last_char = dir:sub(#dir)
-         if last_char ~= "/" and last_char ~= "\\" then
+         if not path_has_trailing_slash(dir) then
             dir = dir .. "/"
          end
 
@@ -105,7 +118,7 @@ local function process_global_env_def_arg(global_env_def)
    return global_env_def
 end
 
-local function run_teal_check(path, global_modules)
+local function run_teal_check_on_file(path, global_modules)
 
 
    local env, env_error = tl.init_env(
@@ -144,6 +157,58 @@ local function run_teal_check(path, global_modules)
    return all_errors
 end
 
+local function get_all_tl_files_in_directory_recursive(start_path)
+   assert(lfs.attributes(start_path, "mode") == "directory")
+   assert(path_has_trailing_slash(start_path))
+
+   local queue = { start_path }
+   local result = {}
+
+   while #queue > 0 do
+      local search_dir = queue[#queue]
+      table.remove(queue, #queue)
+
+      for _, path in ipairs(get_sub_paths(search_dir)) do
+         local full_path = search_dir .. path
+         local path_mode = lfs.attributes(full_path, "mode")
+
+         if path_mode == "directory" then
+            if not path_has_trailing_slash(full_path) then
+               full_path = full_path .. "/"
+            end
+            table.insert(queue, full_path)
+         elseif path_mode == "file" and path:sub(-3) == ".tl" then
+            table.insert(result, full_path)
+         end
+      end
+   end
+
+   return result
+end
+
+local function run_teal_check(path, global_modules)
+   local path_file_type = lfs.attributes(path, "mode")
+
+   if path_file_type == "file" then
+      return run_teal_check_on_file(path, global_modules)
+   end
+
+   assert(path_file_type == "directory", "Invalid path given")
+
+   local all_errors = {}
+   local all_tl_files = get_all_tl_files_in_directory_recursive(path)
+
+   assert(#all_tl_files > 0, "Could not find any .tl files at the given path")
+
+   for _, subpath in ipairs(all_tl_files) do
+      for _, err in ipairs(run_teal_check_on_file(subpath, global_modules)) do
+         table.insert(all_errors, err)
+      end
+   end
+
+   return all_errors
+end
+
 local function construct_lua_path(paths)
    local result = ""
 
@@ -157,9 +222,15 @@ local function construct_lua_path(paths)
    return result
 end
 
+local function adjust_error_message(message)
+
+   message = message:gsub("\n", " ")
+   return message
+end
+
 local function print_errors(errors)
    for _, err in ipairs(errors) do
-      print(string.format("%s:%s:%s:%s", err.filename, err.y, err.x, err.msg))
+      print(string.format("%s:%s:%s:%s", err.filename, err.y, err.x, adjust_error_message(err.msg)))
    end
 end
 
@@ -169,10 +240,11 @@ local function get_path_from_args()
    if not path_is_absolute(path) then
       local cwd = lfs.currentdir()
       assert(cwd, "Failed to obtain current directory")
-      local last_char = cwd:sub(#cwd)
-      if last_char ~= "/" and last_char ~= "\\" then
+
+      if not path_has_trailing_slash(cwd) then
          cwd = cwd .. "/"
       end
+
       path = cwd .. path
    end
 
@@ -181,8 +253,13 @@ end
 
 local function main()
    local path_to_check = get_path_from_args()
+   local path_type = lfs.attributes(path_to_check)
 
-   assert(lfs.attributes(path_to_check) ~= nil, "Invalid path given")
+   assert(path_type ~= nil, "Invalid path given")
+
+   if path_type.mode == "directory" and not path_has_trailing_slash(path_to_check) then
+      path_to_check = path_to_check .. "/"
+   end
 
    local tlconfig_path = try_find_tlconfig_path(path_to_check)
    assert(tlconfig_path ~= nil, "Unable to find a tlconfig.lua file!  Searched given path and all parents")
