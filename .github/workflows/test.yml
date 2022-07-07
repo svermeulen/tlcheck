@@ -34,5 +34,5 @@ jobs:
         run: |
           pwd
           which tlcheck
-          tlcheck `pwd`/src/tlcheck.tl
+          tlcheck /home/runner/work/tlcheck/tlcheck/src/tlcheck.tl
 
