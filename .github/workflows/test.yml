@@ -36,5 +36,6 @@ jobs:
           which tlcheck
           echo "RUNNING..."
           tlcheck /home/runner/work/tlcheck/tlcheck/src/tlcheck.tl
+          echo $?
           echo "done"
 

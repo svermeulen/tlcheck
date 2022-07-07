@@ -16,6 +16,7 @@ local record TealConfig
 end
 
 local function get_parent_path(path:string):string
+   path:yep()
    return path:match('(.*[/\\]).+')
 end
 
