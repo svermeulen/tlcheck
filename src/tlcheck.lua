@@ -35,7 +35,9 @@ local function get_sub_paths(path)
    local result = {}
 
    for sub_path in lfs.dir(path) do
-      if sub_path ~= "." and sub_path ~= ".." then
+
+
+      if sub_path:sub(1, 1) ~= "." then
          table.insert(result, sub_path)
       end
    end
@@ -118,6 +120,11 @@ local function process_global_env_def_arg(global_env_def)
    return global_env_def
 end
 
+local CheckResults = {}
+
+
+
+
 local function run_teal_check_on_file(path, global_modules)
 
 
@@ -135,10 +142,11 @@ local function run_teal_check_on_file(path, global_modules)
    end
 
    local all_errors = {}
+   local all_warnings = {}
 
    if result.warnings then
       for _, err in ipairs(result.warnings) do
-         table.insert(all_errors, err)
+         table.insert(all_warnings, err)
       end
    end
 
@@ -154,7 +162,10 @@ local function run_teal_check_on_file(path, global_modules)
       end
    end
 
-   return all_errors
+   return {
+      errors = all_errors,
+      warnings = all_warnings,
+   }
 end
 
 local function get_all_tl_files_in_directory_recursive(start_path)
@@ -195,18 +206,29 @@ local function run_teal_check(path, global_modules)
 
    assert(path_file_type == "directory", "Invalid path given")
 
-   local all_errors = {}
    local all_tl_files = get_all_tl_files_in_directory_recursive(path)
 
    assert(#all_tl_files > 0, "Could not find any .tl files at the given path")
 
+   local all_errors = {}
+   local all_warnings = {}
+
    for _, subpath in ipairs(all_tl_files) do
-      for _, err in ipairs(run_teal_check_on_file(subpath, global_modules)) do
+      local file_results = run_teal_check_on_file(subpath, global_modules)
+
+      for _, err in ipairs(file_results.errors) do
          table.insert(all_errors, err)
+      end
+
+      for _, err in ipairs(file_results.warnings) do
+         table.insert(all_warnings, err)
       end
    end
 
-   return all_errors
+   return {
+      errors = all_errors,
+      warnings = all_warnings,
+   }
 end
 
 local function construct_lua_path(paths)
@@ -228,9 +250,13 @@ local function adjust_error_message(message)
    return message
 end
 
-local function print_errors(errors)
-   for _, err in ipairs(errors) do
-      print(string.format("%s:%s:%s:%s", err.filename, err.y, err.x, adjust_error_message(err.msg)))
+local function print_errors(results)
+   for _, err in ipairs(results.errors) do
+      print(string.format("error:%s:%s:%s:%s", err.filename, err.y, err.x, adjust_error_message(err.msg)))
+   end
+
+   for _, warning in ipairs(results.warnings) do
+      print(string.format("warning:%s:%s:%s:%s", warning.filename, warning.y, warning.x, adjust_error_message(warning.msg)))
    end
 end
 
@@ -272,11 +298,11 @@ local function main()
    package.path = construct_lua_path(include_dirs)
    package.cpath = ""
 
-   local errors = run_teal_check(path_to_check, global_modules)
+   local results = run_teal_check(path_to_check, global_modules)
 
-   print_errors(errors)
+   print_errors(results)
 
-   if #errors > 0 then
+   if #results.errors > 0 then
       os.exit(1)
    end
 end
