@@ -1,0 +1,14 @@
+
+load("@svkj//buildtools/lua:defs.bzl", "lua_binary")
+
+lua_binary(
+    name = "tlcheck",
+    main = "tlcheck",
+    srcs = ["src/tlcheck.lua"],
+    import_path = "src",
+    deps = [
+        "@svkj//buildtools/teal:tl",
+        "@lua_dep_luafilesystem//:luafilesystem",
+    ],
+)
+
