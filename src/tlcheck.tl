@@ -1,6 +1,8 @@
 
+local tl <const> = require("tl")
+
 if #arg ~= 1 then
-   print("Teal Check\nUsage: teal-check [PATH]\nNote:\n - Given path can be a single .tl file or a directory (which will be searched recursively for all .tl files)\n - A tlconfig.lua file must be present in the given directory or a parent of the given directory/path\n - This program is designed to be more script/machine friendly than human friendly.  The output is easy to parse but not easy to read")
+   print("Teal Check\nUsage: teal-check [PATH]\nNote:\n - Given path can be a single .tl file or a directory (which will be searched recursively for all .tl files)\n - A tlconfig.lua file must be present in the given directory or a parent of the given directory/path\n - This program is designed to be more script/machine friendly than human friendly.  The output is easy to parse but not easy to read.  Using teal version '" .. tl.version() .. "'")
    os.exit(1)
 end
 
@@ -8,11 +10,18 @@ end
 --   * Path strings for directories always have a trailing slash
 
 local lfs <const> = require("lfs")
-local tl <const> = require("tl")
 
 local record TealConfig
    include_dir:{string}
    global_env_def:string
+end
+
+local function ivalues<Value>(t: {any:Value}): function(): Value
+   local i = 0
+   return function(): Value
+      i = i + 1
+      return t[i]
+   end
 end
 
 local function get_parent_path(path:string):string
@@ -20,8 +29,7 @@ local function get_parent_path(path:string):string
 end
 
 local function path_is_absolute(path:string):boolean
-   local first_char = path:sub(1, 1)
-   return first_char == "/" or first_char == "\\"
+   return path:sub(1, 1) == "/" or path:match('^[a-zA-Z]:[\\/]') ~= nil
 end
 
 local function path_has_trailing_slash(path:string):boolean
@@ -125,47 +133,34 @@ local record CheckResults
    warnings:{tl.Error}
 end
 
-local function run_teal_check_on_file(path:string, global_modules:{string}):CheckResults
-
-   -- TODO - get these other parameter values from tlconfig.lua as well
-   local env, env_error = tl.init_env(
-      false, nil, nil, global_modules)
-
-   if env == nil then
-      error("Failed to initialize teal environment!  Details: " .. env_error)
+local function add_result(results:CheckResults, result:tl.Result)
+   if result.warnings then
+      for _, err in ipairs(result.warnings) do
+         table.insert(results.warnings, err)
+      end
    end
 
+   if result.syntax_errors then
+      for _, err in ipairs(result.syntax_errors) do
+         table.insert(results.errors, err)
+      end
+   end
+
+   if result.type_errors then
+      for _, err in ipairs(result.type_errors) do
+         table.insert(results.errors, err)
+      end
+   end
+end
+
+local function run_teal_check_on_file(path:string, env:tl.Env, all_results:CheckResults)
    local result, process_error = tl.process(path, env)
 
    if process_error ~= nil then
       error("Error while processing file '" .. path .. "': " .. process_error)
    end
 
-   local all_errors:{tl.Error} = {}
-   local all_warnings:{tl.Error} = {}
-
-   if result.warnings then
-      for _, err in ipairs(result.warnings) do
-         table.insert(all_warnings, err)
-      end
-   end
-
-   if result.syntax_errors then
-      for _, err in ipairs(result.syntax_errors) do
-         table.insert(all_errors, err)
-      end
-   end
-
-   if result.type_errors then
-      for _, err in ipairs(result.type_errors) do
-         table.insert(all_errors, err)
-      end
-   end
-
-   return {
-      errors = all_errors,
-      warnings = all_warnings,
-   }
+   add_result(all_results, result)
 end
 
 local function get_all_tl_files_in_directory_recursive(start_path:string):{string}
@@ -197,38 +192,52 @@ local function get_all_tl_files_in_directory_recursive(start_path:string):{strin
    return result
 end
 
-local function run_teal_check(path:string, global_modules:{string}):CheckResults
+local function run_teal_check(tlconfig_path:string, path:string, global_modules:{string}):CheckResults
    local path_file_type = lfs.attributes(path, "mode")
 
-   if path_file_type == "file" then
-      return run_teal_check_on_file(path, global_modules)
+   -- TODO - get these other parameter values from tlconfig.lua as well
+   local env, env_error = tl.init_env(
+      false, nil, nil, global_modules)
+
+   if env == nil then
+      return {
+         errors = {
+            {
+               y = 0,
+               x = 0,
+               filename = tlconfig_path,
+               msg = "Failed to initialize teal environment:  " .. env_error
+            },
+         },
+         warnings = {},
+      }
    end
 
-   assert(path_file_type == "directory", "Invalid path given")
-
-   local all_tl_files = get_all_tl_files_in_directory_recursive(path)
-
-   assert(#all_tl_files > 0, "Could not find any .tl files at the given path")
-
-   local all_errors = {}
-   local all_warnings = {}
-
-   for _, subpath in ipairs(all_tl_files) do
-      local file_results = run_teal_check_on_file(subpath, global_modules)
-
-      for _, err in ipairs(file_results.errors) do
-         table.insert(all_errors, err)
-      end
-
-      for _, err in ipairs(file_results.warnings) do
-         table.insert(all_warnings, err)
-      end
-   end
-
-   return {
-      errors = all_errors,
-      warnings = all_warnings,
+   local results:CheckResults = {
+      errors = {},
+      warnings= {},
    }
+
+   if path_file_type == "file" then
+      run_teal_check_on_file(path, env, results)
+   else
+      assert(path_file_type == "directory", "Invalid path given")
+
+      local all_tl_files = get_all_tl_files_in_directory_recursive(path)
+
+      assert(#all_tl_files > 0, "Could not find any .tl files at the given path")
+
+      for _, subpath in ipairs(all_tl_files) do
+         run_teal_check_on_file(subpath, env, results)
+      end
+   end
+
+   for name in ivalues(env.loaded_order) do
+      local res = env.loaded[name]
+      add_result(results, res)
+   end
+
+   return results
 end
 
 local function construct_lua_path(paths:{string}):string
@@ -281,7 +290,7 @@ local function main()
    local path_to_check = get_path_from_args()
    local path_type = lfs.attributes(path_to_check)
 
-   assert(path_type ~= nil, "Invalid path given")
+   assert(path_type ~= nil, string.format("Invalid path given '%s'", path_to_check))
 
    if path_type.mode == "directory" and not path_has_trailing_slash(path_to_check) then
       path_to_check = path_to_check .. "/"
@@ -298,7 +307,7 @@ local function main()
    package.path=construct_lua_path(include_dirs)
    package.cpath=""
 
-   local results = run_teal_check(path_to_check, global_modules)
+   local results = run_teal_check(tlconfig_path, path_to_check, global_modules)
 
    print_errors(results)
 
