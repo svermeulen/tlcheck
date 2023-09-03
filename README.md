@@ -36,7 +36,7 @@ Note:
 
 _Doesn't [cyan](https://github.com/teal-language/cyan) already do this?_
 
-Yes. [cyan](https://github.com/teal-language/cyan) would be a better choice when building/type-checking your teal scripts on the command line manually.  However, the output from cyan [is not currently very script friendly](https://github.com/teal-language/cyan/issues/21).  So `tlcheck` just fills that one particular gap, for cases where you are type checking as part of a larger script/automation, and would like to parse the errors.
+Yes. [cyan](https://github.com/teal-language/cyan) would be a better choice when building/type-checking your teal scripts on the command line manually.  However, the output from cyan [is not currently very script friendly](https://github.com/teal-language/cyan/issues/21).  So `tlcheck` just fills that one particular gap, for cases where you are type checking as part of a larger script/automation/development environment, and would like to parse the errors.
 
 The [tl](https://github.com/teal-language/tl/blob/master/tl) script that comes with teal also provides some of this functionality, however [it appears to be deprecated](https://github.com/teal-language/tl/blob/ce5c741efde0c7417ca443eb268a744e2fd738c4/tl#L253) in favour of cyan.
 
