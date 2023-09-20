@@ -1,6 +1,6 @@
 rockspec_format = "3.0"
 package = "tlcheck"
-version = "1.0.0-1"
+version = "1.0.1-1"
 source = {
    url = "git+https://github.com/svermeulen/tlcheck.git",
    branch = "main"
