@@ -260,12 +260,24 @@ local function adjust_error_message(message)
 end
 
 local function print_errors(results)
+   local seen_errors = {}
+
    for _, err in ipairs(results.errors) do
-      print(string.format("error:%s:%s:%s:%s", err.filename, err.y, err.x, adjust_error_message(err.msg)))
+      local line = string.format("error:%s:%s:%s:%s", err.filename, err.y, err.x, adjust_error_message(err.msg))
+      if seen_errors[line] == nil then
+         seen_errors[line] = true
+         print(line)
+      end
    end
 
+   local seen_warnings = {}
+
    for _, warning in ipairs(results.warnings) do
-      print(string.format("warning:%s:%s:%s:%s", warning.filename, warning.y, warning.x, adjust_error_message(warning.msg)))
+      local line = string.format("warning:%s:%s:%s:%s", warning.filename, warning.y, warning.x, adjust_error_message(warning.msg))
+      if seen_warnings[line] == nil then
+         seen_warnings[line] = true
+         print(line)
+      end
    end
 end
 
