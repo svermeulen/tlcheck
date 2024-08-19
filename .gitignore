@@ -4,3 +4,4 @@
 /.luarocks
 /luarocks.bat
 /lua.bat
+/luarocks_tree
