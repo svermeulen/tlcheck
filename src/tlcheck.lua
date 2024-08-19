@@ -196,8 +196,7 @@ local function run_teal_check_on_file(path, env, all_results)
 end
 
 local function get_all_tl_files_in_directory_recursive(start_path)
-   assert(lfs.attributes(start_path, "mode") == "directory")
-   assert(path_has_trailing_slash(start_path))
+   assert(try_get_path_type(start_path) == "directory")
 
    local queue = { start_path }
    local result = {}
@@ -207,13 +206,10 @@ local function get_all_tl_files_in_directory_recursive(start_path)
       table.remove(queue, #queue)
 
       for _, path in ipairs(get_sub_paths(search_dir)) do
-         local full_path = search_dir .. path
-         local path_mode = lfs.attributes(full_path, "mode")
+         local full_path = path_join(search_dir, path)
+         local path_mode = try_get_path_type(full_path)
 
          if path_mode == "directory" then
-            if not path_has_trailing_slash(full_path) then
-               full_path = full_path .. "/"
-            end
             table.insert(queue, full_path)
          elseif path_mode == "file" and path:sub(-3) == ".tl" then
             table.insert(result, full_path)
