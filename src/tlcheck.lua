@@ -6,10 +6,12 @@ if #arg ~= 1 then
    os.exit(1)
 end
 
-
-
-
 local lfs = require("lfs")
+
+
+
+
+
 
 
 
@@ -24,7 +26,7 @@ local function ivalues(t)
    end
 end
 
-local function get_parent_path(path)
+local function try_get_parent_path(path)
    return path:match('(.*[/\\]).+')
 end
 
@@ -37,8 +39,26 @@ local function path_has_trailing_slash(path)
    return last_char == "/" or last_char == "\\"
 end
 
+local function remove_trailing_slash_if_exists(path)
+   if path_has_trailing_slash(path) then
+      return path:sub(1, #path - 1)
+   end
+   return path
+end
+
+local function try_get_path_type(path)
+
+   path = remove_trailing_slash_if_exists(path)
+
+   local path_type = lfs.attributes(path, "mode")
+   if path_type ~= "directory" and path_type ~= "file" then
+      path_type = nil
+   end
+   return path_type
+end
+
 local function get_sub_paths(path)
-   assert(lfs.attributes(path, "mode") == "directory")
+   assert(try_get_path_type(path) == "directory")
 
    local result = {}
 
@@ -53,30 +73,42 @@ local function get_sub_paths(path)
    return result
 end
 
+local function path_join(left, right)
+   if path_has_trailing_slash(left) then
+      return left .. right
+   end
+
+   return string.format("%s/%s", left, right)
+end
+
 local function try_find_tlconfig_path(start_search_path)
    assert(#start_search_path > 0, "Invalid path given")
    assert(path_is_absolute(start_search_path))
 
-   local search_dir
-   local file_type = lfs.attributes(start_search_path, "mode")
+   local path_type = try_get_path_type(start_search_path)
 
-   if file_type == "directory" then
+   if path_type == nil then
+      error(string.format("Invalid path given '%s'", start_search_path))
+   end
+
+   local search_dir
+
+   if path_type == "directory" then
       search_dir = start_search_path
-      assert(path_has_trailing_slash(search_dir))
    else
-      assert(file_type == "file", "Invalid path given")
-      search_dir = get_parent_path(start_search_path)
+      assert(path_type == "file")
+      search_dir = try_get_parent_path(start_search_path)
    end
 
    while search_dir ~= nil do
       for _, sub_path in ipairs(get_sub_paths(search_dir)) do
-         local full_path = search_dir .. sub_path
-         if sub_path == "tlconfig.lua" and lfs.attributes(full_path, "mode") == "file" then
+         local full_path = path_join(search_dir, sub_path)
+         if sub_path == "tlconfig.lua" and try_get_path_type(full_path) == "file" then
             return full_path
          end
       end
 
-      search_dir = get_parent_path(search_dir)
+      search_dir = try_get_parent_path(search_dir)
    end
 
    return nil
@@ -97,7 +129,7 @@ local function process_include_dir_arg(include_dir, tlconfig_path)
    end
 
    local adjusted_dirs = {}
-   local tlconfig_dir = get_parent_path(tlconfig_path)
+   local tlconfig_dir = try_get_parent_path(tlconfig_path)
 
    for _, dir in ipairs(all_dirs) do
       assert(#dir > 0, "Invalid value given for include_dir")
@@ -193,7 +225,7 @@ local function get_all_tl_files_in_directory_recursive(start_path)
 end
 
 local function run_teal_check(tlconfig_path, path, global_modules)
-   local path_file_type = lfs.attributes(path, "mode")
+   local path_file_type = try_get_path_type(path)
 
 
    local env, env_error = tl.init_env(
@@ -287,12 +319,7 @@ local function get_path_from_args()
    if not path_is_absolute(path) then
       local cwd = lfs.currentdir()
       assert(cwd, "Failed to obtain current directory")
-
-      if not path_has_trailing_slash(cwd) then
-         cwd = cwd .. "/"
-      end
-
-      path = cwd .. path
+      path = path_join(cwd, path)
    end
 
    return path
@@ -300,13 +327,6 @@ end
 
 local function main()
    local path_to_check = get_path_from_args()
-   local path_type = lfs.attributes(path_to_check)
-
-   assert(path_type ~= nil, string.format("Invalid path given '%s'", path_to_check))
-
-   if path_type.mode == "directory" and not path_has_trailing_slash(path_to_check) then
-      path_to_check = path_to_check .. "/"
-   end
 
    local tlconfig_path = try_find_tlconfig_path(path_to_check)
    assert(tlconfig_path ~= nil, "Unable to find a tlconfig.lua file!  Searched given path and all parents")
